@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Input, Textarea } from './components/ui'
 
 type ContextState = {
@@ -9,13 +9,10 @@ type ContextState = {
   emotion: string
 }
 
-type AdaptOption = {
+type TranslateOption = {
   text: string
-  style: 'hindi' | 'hinglish'
-  syllables: number
-  target_syllables: number
-  timing_error_pct: number
   score: number
+  note: string
 }
 
 const initialContext: ContextState = {
@@ -27,17 +24,27 @@ const initialContext: ContextState = {
 }
 
 const relations = ['senior', 'boss', 'teacher', 'friend', 'junior', 'family', 'lover', 'enemy']
-
 export default function App() {
+  const [headerScrolled, setHeaderScrolled] = useState(false)
   const [sourceText, setSourceText] = useState('')
   const [context, setContext] = useState(initialContext)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [showContext, setShowContext] = useState(false)
   const [timingMode, setTimingMode] = useState<'auto' | 'manual'>('auto')
   const [slotSeconds, setSlotSeconds] = useState('2.5')
-  const [options, setOptions] = useState<AdaptOption[]>([])
+  const [options, setOptions] = useState<TranslateOption[]>([])
+  const [hasAdapted, setHasAdapted] = useState(false)
+  const [demoTranslation, setDemoTranslation] = useState<string | null>(null)
+  const [resultsOpen, setResultsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    const updateHeader = () => setHeaderScrolled(window.scrollY > 8)
+    updateHeader()
+    window.addEventListener('scroll', updateHeader, { passive: true })
+    return () => window.removeEventListener('scroll', updateHeader)
+  }, [])
 
   const contextLines = useMemo(() => {
     return [
@@ -54,20 +61,22 @@ export default function App() {
   }
 
   const adaptLine = async () => {
+    setDemoTranslation(null)
+    setResultsOpen(true)
     setIsLoading(true)
     setErrorMessage('')
     setOptions([])
+    setHasAdapted(false)
     const contextText = contextLines.join('\n')
     const payload: Record<string, unknown> = {
       ja: sourceText.trim(),
       context: contextText,
-      styles: ['hindi', 'hinglish'],
       limit: 10,
     }
     if (timingMode === 'manual') payload.slot_seconds = Number(slotSeconds)
 
     try {
-      const response = await fetch('/api/v1/adapt', {
+      const response = await fetch('/api/v1/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -77,6 +86,7 @@ export default function App() {
         throw new Error(typeof result.detail === 'string' ? result.detail : 'Could not adapt this line.')
       }
       setOptions(result.options ?? [])
+      setHasAdapted(true)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Could not connect to the adaptation service.')
     } finally {
@@ -92,12 +102,15 @@ export default function App() {
     setTimingMode('auto')
     setSlotSeconds('2.5')
     setOptions([])
+    setHasAdapted(false)
+    setDemoTranslation(null)
+    setResultsOpen(false)
     setErrorMessage('')
   }
 
   return (
     <main className="page-shell">
-      <header className="topbar">
+      <header className={`topbar${headerScrolled ? ' is-scrolled' : ''}`}>
         <a className="brand" href="#top" aria-label="Dubstep home">
           <span className="brand-mark">d.</span>
           <span>dubstep</span>
@@ -117,9 +130,10 @@ export default function App() {
       </header>
 
       <section className="hero" id="top">
-        <div className="eyebrow"><span>01</span> SAY IT YOUR WAY</div>
+        <div className="eyebrow">SAY IT YOUR WAY</div>
         <h1>Make every line<br /><em>feel like it belongs.</em></h1>
         <p className="intro">Start with a line. Add a little context to shape how it sounds.</p>
+        <span className="hindi-greeting" aria-hidden="true">नमस्ते</span>
         <div className="japanese-stamp" aria-hidden="true"><span>言葉</span><small>こ と ば</small></div>
         <svg className="sakura-branch" viewBox="0 0 190 170" aria-hidden="true">
           <path className="branch-line" d="M12 151 C53 120 71 101 89 73 C105 48 127 35 169 17 M73 102 C48 84 37 63 31 37 M104 61 C92 39 93 22 99 9 M124 40 C147 44 163 57 175 77" />
@@ -128,11 +142,30 @@ export default function App() {
           <g className="blossom blossom-three" transform="translate(166 80) scale(.68)"><path d="M0 0 C-16-19-7-31 2-19 C12-34 23-25 14-10 C33-13 35 1 17 6 C31 20 20 31 7 15 C1 34-13 28-9 10 C-28 15-31 1-13-5 C-27-20-16-30-4-13Z"/><circle r="4" /></g>
           <g className="blossom blossom-four" transform="translate(67 94) scale(.48)"><path d="M0 0 C-16-19-7-31 2-19 C12-34 23-25 14-10 C33-13 35 1 17 6 C31 20 20 31 7 15 C1 34-13 28-9 10 C-28 15-31 1-13-5 C-27-20-16-30-4-13Z"/><circle r="4" /></g>
         </svg>
+        <svg className="indian-rangoli" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="53" fill="#fff0a7" fillOpacity=".85" stroke="#49395c" strokeWidth="2" strokeDasharray="3 4" />
+          <g fill="#f28d35" stroke="#49395c" strokeWidth="1.5">
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(45 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(90 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(135 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(180 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(225 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(270 60 60)" />
+            <path d="M60 12c14 15 15 29 0 42-15-13-14-27 0-42Z" transform="rotate(315 60 60)" />
+          </g>
+          <circle cx="60" cy="60" r="13" fill="#54bfae" stroke="#49395c" strokeWidth="2" />
+          <circle cx="60" cy="60" r="5" fill="#f7d75e" stroke="#49395c" strokeWidth="1.5" />
+          <g fill="#54bfae" stroke="#49395c" strokeWidth="1.5">
+            <circle cx="60" cy="4" r="3" /><circle cx="60" cy="116" r="3" /><circle cx="4" cy="60" r="3" /><circle cx="116" cy="60" r="3" />
+          </g>
+        </svg>
       </section>
 
+      <div className="workbench-layout">
       <Card className="workspace" aria-label="Dialogue input">
         <div className="section-heading">
-          <div><span className="step-number">01</span><h2>Your line</h2></div>
+          <div><h2>Your line</h2></div>
           <span className="field-hint">Japanese source text</span>
         </div>
         <label className="sr-only" htmlFor="source-text">Text to adapt</label>
@@ -141,12 +174,17 @@ export default function App() {
           className="source-input"
           placeholder="Type or paste a line here…"
           value={sourceText}
-          onChange={(event) => setSourceText(event.target.value)}
+          onChange={(event) => { setSourceText(event.target.value); setOptions([]); setHasAdapted(false); setDemoTranslation(null); setResultsOpen(false); setErrorMessage('') }}
           maxLength={2000}
           rows={4}
         />
         <div className="input-meta"><span>Your original dialogue</span><span>{sourceText.length} / 2000</span></div>
-
+        <div className="sample-row">
+          <span>Test without the backend</span>
+          <button type="button" className="sample-phrase" onClick={() => { setSourceText('こんにちは'); setDemoTranslation('नमस्ते'); setOptions([]); setHasAdapted(false); setResultsOpen(true); setErrorMessage('') }}>
+            <span lang="ja">こんにちは</span><span aria-hidden="true">→</span><span lang="hi">नमस्ते</span>
+          </button>
+        </div>
         <div className="timing-section">
           <div className="timing-heading">
             <div><span className="timing-icon" aria-hidden="true">◷</span><div><strong>Line timing</strong><small>Set a delivery length or let the model estimate it.</small></div></div>
@@ -207,12 +245,18 @@ export default function App() {
 
         <Button variant="primary" className="submit-button" type="button" onClick={adaptLine} disabled={!sourceText.trim() || isLoading || (timingMode === 'manual' && (Number(slotSeconds) < 0.1 || Number(slotSeconds) > 60))}>
           <span>{isLoading ? 'Adapting…' : 'Adapt this line'}</span>
-          {isLoading ? <span className="loading-mark" aria-hidden="true">◌</span> : <svg className="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
+          {isLoading ? <span className="spinner" aria-hidden="true" /> : <svg className="button-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
         </Button>
         <p className="submit-note">{timingMode === 'auto' ? 'The model estimates timing from the line length.' : 'The model will fit suggestions to your duration.'}</p>
-        {errorMessage && <div className="request-message error-message" role="alert">{errorMessage} <small>Make sure the backend is running.</small></div>}
-        {options.length > 0 && <section className="results" aria-live="polite"><div className="results-heading"><strong>Suggestions</strong><span>{options.length} options</span></div>{options.map((option, index) => <article className="result-card" key={`${option.style}-${index}`}><div><Badge className="result-style">{option.style}</Badge><span className="result-fit">{option.timing_error_pct.toFixed(1)}% timing difference</span></div><p>{option.text}</p><small>{option.syllables} / {option.target_syllables} syllables</small></article>)}</section>}
       </Card>
+      {resultsOpen && (demoTranslation || hasAdapted || errorMessage || isLoading) && <aside className="results-panel" aria-label="Translation results" aria-live="polite">
+        <Button type="button" variant="ghost" className="panel-close" aria-label="Close results" onClick={() => setResultsOpen(false)}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></Button>
+        {demoTranslation && <div className="demo-result" role="status"><div><Badge className="demo-badge">LOCAL DEMO</Badge><span>Hindi sample result</span></div><p lang="hi">{demoTranslation}</p></div>}
+        {isLoading && <div className="panel-waiting"><span className="spinner" aria-hidden="true" /><span>Finding the best Hindi matches…</span></div>}
+        {errorMessage && <div className="request-message error-message" role="alert">{errorMessage}</div>}
+        {hasAdapted && <section className="results"><div className="results-heading"><strong>Top ranked Hindi phrases</strong><span>Showing {options.length} of up to 10</span></div>{options.length ? options.map((option, index) => <article className="result-card" key={`${index}-${option.text}`}><div><Badge className="result-style">#{String(index + 1).padStart(2, '0')} · Hindi</Badge><span className="result-fit">Match {option.score}/100</span></div><p lang="hi">{option.text}</p><small>{option.note}</small></article>) : <p className="empty-results">No matches came back for this line. Try a different line or context.</p>}</section>}
+      </aside>}
+      </div>
 
       <footer><span>BUILT FOR LINES THAT LAND.</span><span>Dubstep <b>·</b> Dialogue adaptation</span></footer>
     </main>

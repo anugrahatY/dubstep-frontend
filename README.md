@@ -10,4 +10,4 @@ npm install
 npm run dev
 ```
 
-The selected context fields are sent as the API's `context` string. Automatic timing omits a timing hint so the model estimates a syllable target from the English line length. Manual timing sends `slot_seconds`. The Vite dev server proxies `/api` to the backend at `127.0.0.1:8000`.
+Clicking “Adapt this line” sends the Japanese text and optional context to `POST /api/v1/translate`, which returns up to ten ranked Hindi idiom and phrase adaptations from Groq. Automatic timing lets Groq choose a natural spoken length; manual timing sends `slot_seconds`. The Vite dev server proxies `/api` to the backend at `127.0.0.1:8000`.
