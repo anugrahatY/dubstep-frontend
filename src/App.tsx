@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Input, Textarea } from './components/ui'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+
 type ContextState = {
   speaker: string
   listener: string
@@ -15,6 +17,8 @@ type TranslateOption = {
   note: string
 }
 
+type TranslationProvider = 'groq' | 'local'
+
 const initialContext: ContextState = {
   speaker: '',
   listener: '',
@@ -27,6 +31,7 @@ const relations = ['senior', 'boss', 'teacher', 'friend', 'junior', 'family', 'l
 export default function App() {
   const [headerScrolled, setHeaderScrolled] = useState(false)
   const [sourceText, setSourceText] = useState('')
+  const [provider, setProvider] = useState<TranslationProvider>('groq')
   const [context, setContext] = useState(initialContext)
   const [contextExpanded, setContextExpanded] = useState(false)
   const [showContext, setShowContext] = useState(false)
@@ -60,6 +65,14 @@ export default function App() {
     setContext((current) => ({ ...current, [field]: value }))
   }
 
+  const chooseProvider = (value: TranslationProvider) => {
+    setProvider(value)
+    setOptions([])
+    setHasAdapted(false)
+    setErrorMessage('')
+    setResultsOpen(false)
+  }
+
   const adaptLine = async () => {
     setDemoTranslation(null)
     setResultsOpen(true)
@@ -67,16 +80,16 @@ export default function App() {
     setErrorMessage('')
     setOptions([])
     setHasAdapted(false)
-    const contextText = contextLines.join('\n')
     const payload: Record<string, unknown> = {
       ja: sourceText.trim(),
-      context: contextText,
+      context,
+      provider,
       limit: 10,
     }
     if (timingMode === 'manual') payload.slot_seconds = Number(slotSeconds)
 
     try {
-      const response = await fetch('/api/v1/translate', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -101,6 +114,7 @@ export default function App() {
     setShowContext(false)
     setTimingMode('auto')
     setSlotSeconds('2.5')
+    setProvider('groq')
     setOptions([])
     setHasAdapted(false)
     setDemoTranslation(null)
@@ -115,18 +129,26 @@ export default function App() {
           <span className="brand-mark">d.</span>
           <span>dubstep</span>
         </a>
-        <span className="profile-avatar" role="img" aria-label="Profile">
-          <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
-            <circle cx="20" cy="20" r="18" fill="#ffe4ee" />
-            <path d="M8.5 31.5c1.8-5.1 6-7.6 11.5-7.6s9.7 2.5 11.5 7.6" fill="#8c6b9e" stroke="#49395c" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M11.5 17.2c0-6 3.5-10 8.5-10s8.5 4 8.5 10v2.3c0 5.1-3.6 8.2-8.5 8.2s-8.5-3.1-8.5-8.2v-2.3Z" fill="#ffd9c8" stroke="#49395c" strokeWidth="1.8" />
-            <path d="M10.8 17c.4-6.6 4.1-11.1 9.8-11.1 5.4 0 8.7 4 8.8 10.3-2.1-.2-4.5-1.8-6.1-4.1-2.7 3-7.2 4.7-12.5 4.9Z" fill="#49395c" />
-            <circle cx="17" cy="19.5" r=".9" fill="#49395c" />
-            <circle cx="23" cy="19.5" r=".9" fill="#49395c" />
-            <path d="M18 23c1.2 1 2.8 1 4 0" stroke="#b66c85" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="m31.8 7 .9 1.8 1.8.9-1.8.9-.9 1.8-.9-1.8-1.8-.9 1.8-.9.9-1.8Z" fill="#ffe58f" />
-          </svg>
-        </span>
+        <button
+          type="button"
+          role="switch"
+          className={`profile-avatar${provider === 'local' ? ' is-local-model' : ''}`}
+          aria-label={`Translation model: ${provider === 'groq' ? 'Groq' : 'Our model'}. Switch to ${provider === 'groq' ? 'our model' : 'Groq'}.`}
+          aria-checked={provider === 'local'}
+          title={`Using ${provider === 'groq' ? 'Groq' : 'Our model'} · click to switch`}
+          onClick={() => chooseProvider(provider === 'groq' ? 'local' : 'groq')}
+        >
+            <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+              <circle cx="20" cy="20" r="18" fill="#ffe4ee" />
+              <path d="M8.5 31.5c1.8-5.1 6-7.6 11.5-7.6s9.7 2.5 11.5 7.6" fill="#8c6b9e" stroke="#49395c" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M11.5 17.2c0-6 3.5-10 8.5-10s8.5 4 8.5 10v2.3c0 5.1-3.6 8.2-8.5 8.2s-8.5-3.1-8.5-8.2v-2.3Z" fill="#ffd9c8" stroke="#49395c" strokeWidth="1.8" />
+              <path d="M10.8 17c.4-6.6 4.1-11.1 9.8-11.1 5.4 0 8.7 4 8.8 10.3-2.1-.2-4.5-1.8-6.1-4.1-2.7 3-7.2 4.7-12.5 4.9Z" fill="#49395c" />
+              <circle cx="17" cy="19.5" r=".9" fill="#49395c" />
+              <circle cx="23" cy="19.5" r=".9" fill="#49395c" />
+              <path d="M18 23c1.2 1 2.8 1 4 0" stroke="#b66c85" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="m31.8 7 .9 1.8 1.8.9-1.8.9-.9 1.8-.9-1.8-1.8-.9 1.8-.9.9-1.8Z" fill="#ffe58f" />
+            </svg>
+        </button>
       </header>
 
       <section className="hero" id="top">
